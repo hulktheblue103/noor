@@ -23,12 +23,20 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Inject secrets into index.html
+        run: |
+          sed -i "s|YOUR_FIREBASE_API_KEY|${{ secrets.FIREBASE_API_KEY }}|g" index.html
+          sed -i "s|YOUR_FIREBASE_API_KEY|${{ secrets.FIREBASE_API_KEY }}|g" firebase-messaging-sw.js
+
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
 
       - name: Upload site files
         uses: actions/upload-pages-artifact@v3

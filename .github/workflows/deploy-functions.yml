@@ -5,12 +5,15 @@ on:
     branches:
       - main
     paths:
-      - 'functions/**'   # Only triggers when functions/ folder changes
+      - 'functions/**'
 
 jobs:
   deploy:
     name: Deploy to Firebase
     runs-on: ubuntu-latest
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout repo
@@ -26,6 +29,10 @@ jobs:
       - name: Install dependencies
         run: npm install
         working-directory: functions
+
+      - name: Inject secrets into functions
+        run: |
+          sed -i "s|YOUR_EMAILJS_PRIVATE_KEY|${{ secrets.EMAILJS_PRIVATE_KEY }}|g" functions/index.js
 
       - name: Deploy Firebase Functions
         uses: w9jds/firebase-action@master

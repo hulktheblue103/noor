@@ -4,7 +4,7 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-com
 const CACHE = 'noor-v5';
 
 firebase.initializeApp({
-  apiKey: "AIzaSyDa5CZg-6-ov2engEJiOwaLeOi3kVDS3g4",
+  apiKey: "YOUR_FIREBASE_API_KEY",
   authDomain: "noor-6efb3.firebaseapp.com",
   projectId: "noor-6efb3",
   storageBucket: "noor-6efb3.firebasestorage.app",
