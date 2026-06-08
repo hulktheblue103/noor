@@ -20,6 +20,7 @@ const EMAILJS_SERVICE_ID = "service_ys14bnd";
 const EMAILJS_TEMPLATE_ID = "template_npvb9gg";
 const EMAILJS_PRIVATE_KEY = "YOUR_EMAILJS_PRIVATE_KEY"; // Add this from EmailJS dashboard → Account → API Keys
 
+// Convert Gregorian date to Hijri date (using the Umm al-Qura approximation)
 function gregorianToHijri(date) {
   const y = date.getFullYear(), m = date.getMonth() + 1, d = date.getDate();
   const jd = Math.floor((14 - m) / 12);
