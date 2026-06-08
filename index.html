@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Noor — Hijri Calendar & Fasting Reminder</title>
+
+<!-- PWA Meta -->
+<meta name="application-name" content="Noor"/>
+<meta name="description" content="Hijri calendar with Ayyam al-Bid fasting reminders"/>
+<meta name="theme-color" content="#1a1410"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Noor"/>
+
+<!-- PWA Manifest (data URI — works on real domains) -->
+<link rel="manifest" href="manifest.json"/>
+
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Scheherazade+New:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+<!-- EmailJS -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1410;
+    --gold: #c9a84c;
+    --gold-light: #e8d5a3;
+    --gold-pale: #f7f0de;
+    --parchment: #faf6ee;
+    --parchment-dark: #f0e8d4;
+    --rust: #8b3a2a;
+    --teal: #2a6b6b;
+    --white-day: #c9a84c;
+    --radius: 12px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--parchment);
+    color: var(--ink);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Geometric background pattern */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(201,168,76,0.04) 40px, rgba(201,168,76,0.04) 41px),
+      repeating-linear-gradient(-45deg, transparent, transparent 40px, rgba(201,168,76,0.04) 40px, rgba(201,168,76,0.04) 41px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+    animation: fadeDown 0.8s ease both;
+  }
+
+  .logo-symbol {
+    font-family: 'Scheherazade New', serif;
+    font-size: 48px;
+    color: var(--gold);
+    display: block;
+    margin-bottom: 8px;
+    line-height: 1;
+  }
+
+  .logo-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 42px;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: var(--ink);
+  }
+
+  .logo-name span {
+    color: var(--gold);
+    font-style: italic;
+  }
+
+  .tagline {
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #8a7a5a;
+    margin-top: 6px;
+  }
+
+  /* Divider */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 20px auto;
+    max-width: 300px;
+  }
+  .divider-line { flex: 1; height: 1px; background: var(--gold-light); }
+  .divider-diamond {
+    width: 8px; height: 8px;
+    background: var(--gold);
+    transform: rotate(45deg);
+    flex-shrink: 0;
+  }
+
+  /* Today badge */
+  .today-hijri {
+    text-align: center;
+    background: var(--ink);
+    color: var(--gold-light);
+    border-radius: var(--radius);
+    padding: 20px 32px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.8s 0.2s ease both;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .today-hijri::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 30% 50%, rgba(201,168,76,0.12) 0%, transparent 70%);
+  }
+
+  .today-label {
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: #8a7a5a;
+    margin-bottom: 4px;
+  }
+
+  .today-date-hijri {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--gold-light);
+  }
+
+  .today-date-greg {
+    font-size: 13px;
+    color: #6a5a3a;
+    margin-top: 4px;
+  }
+
+  .white-days-badge {
+    display: inline-block;
+    background: var(--gold);
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-top: 10px;
+  }
+
+  /* Calendar card */
+  .calendar-card {
+    background: #fff;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 40px rgba(26,20,16,0.08), 0 1px 4px rgba(26,20,16,0.04);
+    animation: fadeUp 0.8s 0.3s ease both;
+    margin-bottom: 28px;
+  }
+
+  .cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    background: var(--ink);
+    color: var(--gold-light);
+  }
+
+  .cal-nav-btn {
+    background: none;
+    border: 1px solid rgba(201,168,76,0.3);
+    color: var(--gold);
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .cal-nav-btn:hover { background: rgba(201,168,76,0.15); border-color: var(--gold); }
+
+  .cal-month-title {
+    text-align: center;
+  }
+  .cal-month-hijri {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--gold-light);
+  }
+  .cal-month-greg {
+    font-size: 12px;
+    color: #6a5a3a;
+    margin-top: 2px;
+  }
+
+  .cal-grid-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: var(--parchment-dark);
+    padding: 10px 0 6px;
+  }
+  .cal-grid-header span {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #8a7a5a;
+  }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    padding: 12px;
+    gap: 4px;
+  }
+
+  .cal-day {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    cursor: default;
+    transition: background 0.15s;
+    position: relative;
+    padding: 4px 2px;
+  }
+
+  .cal-day.empty { background: transparent; }
+
+  .cal-day.normal:hover { background: var(--gold-pale); }
+
+  .cal-day.today {
+    background: var(--ink);
+  }
+
+
+  .cal-day.white-day {
+    background: linear-gradient(135deg, #fdf6e3, #f5e9c0);
+    border: 1.5px solid var(--gold-light);
+  }
+
+  .cal-day.white-day::after {
+    content: '✦';
+    position: absolute;
+    top: 3px;
+    right: 5px;
+    font-size: 7px;
+    color: var(--gold);
+  }
+
+  .cal-day.today.white-day {
+    background: linear-gradient(135deg, #3a2010, #1a1410);
+    border-color: var(--gold);
+  }
+
+
+  /* .main-num and .sub-num defined below */
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    padding: 14px 24px;
+    border-top: 1px solid var(--parchment-dark);
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: #6a5a3a;
+  }
+  .legend-dot {
+    width: 14px; height: 14px; border-radius: 4px;
+  }
+  .legend-dot.white { background: linear-gradient(135deg, #fdf6e3, #f5e9c0); border: 1.5px solid var(--gold-light); }
+  .legend-dot.today { background: var(--ink); }
+
+  /* Ayyam al-Bid info */
+  .info-card {
+    background: linear-gradient(135deg, var(--ink), #2a1e10);
+    border-radius: 16px;
+    padding: 24px 28px;
+    color: var(--gold-light);
+    margin-bottom: 24px;
+    animation: fadeUp 0.8s 0.4s ease both;
+    position: relative;
+    overflow: hidden;
+  }
+  .info-card::before {
+    content: 'الأيام البيض';
+    font-family: 'Scheherazade New', serif;
+    font-size: 80px;
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(201,168,76,0.07);
+    pointer-events: none;
+    line-height: 1;
+  }
+
+  .info-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+  .info-text {
+    font-size: 13px;
+    line-height: 1.7;
+    color: #b0a07a;
+    max-width: 500px;
+  }
+  .info-dates {
+    display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;
+  }
+  .info-date-pill {
+    background: rgba(201,168,76,0.15);
+    border: 1px solid rgba(201,168,76,0.3);
+    color: var(--gold);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 15px;
+    padding: 6px 16px;
+    border-radius: 20px;
+  }
+
+  /* Notification section */
+  .reminder-section { margin-bottom: 4px; }
+  .reminder-section-title { font-size: 14px; font-weight: 500; color: var(--ink); margin-bottom: 2px; }
+  .reminder-section-sub { font-size: 12px; color: #8a7a5a; margin-bottom: 12px; }
+  .email-input-row { display: flex; flex-direction: column; gap: 8px; }
+  .email-input {
+    width: 100%; padding: 12px 14px; border: 1.5px solid var(--parchment-dark);
+    border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px;
+    color: var(--ink); background: var(--parchment); outline: none;
+    transition: border-color 0.2s; box-sizing: border-box;
+  }
+  .email-input:focus { border-color: var(--gold); }
+  .email-btn { width: 100%; padding: 12px 18px; }
+  .unsub-btn {
+    width: 100%; padding: 10px; margin-top: 8px;
+    background: none; border: 1.5px solid #e0d0c0;
+    border-radius: 10px; font-family: 'DM Sans', sans-serif;
+    font-size: 13px; color: #a08060; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .unsub-btn:hover { border-color: var(--rust); color: var(--rust); background: #fdf0f0; }
+  /* Notification section */
+  .notif-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px 28px;
+    box-shadow: 0 2px 20px rgba(26,20,16,0.06);
+    animation: fadeUp 0.8s 0.5s ease both;
+    margin-bottom: 24px;
+  }
+  .notif-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .notif-sub {
+    font-size: 12px;
+    color: #8a7a5a;
+    margin-bottom: 20px;
+  }
+
+  .notif-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .notif-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 1.5px solid var(--parchment-dark);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .notif-option:hover { border-color: var(--gold-light); background: var(--gold-pale); }
+  .notif-option.selected { border-color: var(--gold); background: var(--gold-pale); }
+
+  .notif-option input[type="radio"] { display: none; }
+
+  .notif-radio {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--gold-light);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .notif-option.selected .notif-radio {
+    border-color: var(--gold);
+    background: var(--gold);
+  }
+  .notif-option.selected .notif-radio::after {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #fff;
+  }
+
+  .notif-option-text strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .notif-option-text span {
+    font-size: 12px;
+    color: #8a7a5a;
+  }
+
+  .notif-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--ink);
+    color: var(--gold);
+    border: none;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .notif-btn:hover { background: #2a1e10; transform: translateY(-1px); }
+  .notif-btn:active { transform: translateY(0); }
+
+  .notif-status {
+    margin-top: 12px;
+    font-size: 13px;
+    text-align: center;
+    padding: 10px;
+    border-radius: 8px;
+    display: none;
+  }
+  .notif-status.success { background: #edf7f0; color: #2d6a4f; display: block; }
+  .notif-status.error { background: #fdf0f0; color: var(--rust); display: block; }
+  .notif-status.info { background: var(--gold-pale); color: #6a5a3a; display: block; }
+
+  /* Upcoming fasts */
+  .upcoming-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px 28px;
+    box-shadow: 0 2px 20px rgba(26,20,16,0.06);
+    animation: fadeUp 0.8s 0.6s ease both;
+  }
+  .upcoming-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 16px;
+  }
+  .upcoming-list { display: flex; flex-direction: column; gap: 10px; }
+  .upcoming-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--parchment);
+    border-radius: 10px;
+    border-left: 3px solid var(--gold);
+  }
+  .upcoming-item-left strong {
+    display: block;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .upcoming-item-left span {
+    font-size: 12px;
+    color: #8a7a5a;
+  }
+  .upcoming-countdown {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+    color: var(--rust);
+    font-weight: 600;
+    text-align: right;
+  }
+  .upcoming-countdown small {
+    display: block;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px;
+    color: #aaa;
+    font-weight: 400;
+  }
+
+  /* Animations */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Toggle row below nav */
+  .cal-toggle-row {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0;
+    background: var(--parchment-dark);
+    border-bottom: 1px solid #e8dcc8;
+  }
+
+  /* Calendar mode toggle */
+  .cal-mode-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 0 auto 0;
+    background: rgba(201,168,76,0.1);
+    border-radius: 20px;
+    padding: 3px;
+    width: fit-content;
+  }
+  .toggle-btn {
+    background: none;
+    border: none;
+    color: #8a7a5a;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    padding: 5px 14px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .toggle-btn.active {
+    background: var(--gold);
+    color: var(--ink);
+  }
+
+  /* Unified day number styles */
+  .cal-day .main-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .cal-day .sub-num {
+    font-size: 10px;
+    color: #aaa;
+    margin-top: 2px;
+    line-height: 1;
+  }
+  .cal-day.today .main-num { color: var(--gold); }
+  .cal-day.today .sub-num { color: #6a5a3a; }
+  .cal-day.white-day .main-num { color: var(--rust); font-weight: 700; }
+  .cal-day.today.white-day .main-num { color: var(--gold); }
+
+  /* Donation card */
+  .donation-card {
+    background: linear-gradient(135deg, var(--ink), #2a1e10);
+    border-radius: 16px;
+    padding: 28px;
+    text-align: center;
+    margin-bottom: 24px;
+    animation: fadeUp 0.8s 0.7s ease both;
+  }
+  .donation-symbol {
+    font-size: 36px;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+  .donation-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    color: var(--gold-light);
+    margin-bottom: 8px;
+  }
+  .donation-text {
+    font-size: 13px;
+    color: #8a7a5a;
+    line-height: 1.7;
+    margin-bottom: 20px;
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .donation-btn {
+    display: inline-block;
+    background: var(--gold);
+    color: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 14px 32px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: all 0.2s;
+    margin-bottom: 12px;
+  }
+  .donation-btn:hover { background: var(--gold-light); transform: translateY(-1px); }
+  .donation-note {
+    font-size: 12px;
+    color: #5a4a2a;
+    font-style: italic;
+  }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .main-num { font-size: 15px !important; }
+    .sub-num { font-size: 9px !important; }
+    .cal-grid { gap: 2px; padding: 8px; }
+    .info-card { padding: 20px; }
+    .notif-card, .upcoming-card { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <span class="logo-symbol">☽</span>
+    <div class="logo-name">N<span>oor</span></div>
+    <div class="tagline">Hijri Calendar & Fasting Reminder</div>
+    <div class="divider"><div class="divider-line"></div><div class="divider-diamond"></div><div class="divider-line"></div></div>
+  </div>
+
+  <!-- Today badge -->
+  <div class="today-hijri" id="todayBadge">
+    <div class="today-label">Today</div>
+    <div class="today-date-hijri" id="todayHijri">—</div>
+    <div class="today-date-greg" id="todayGreg">—</div>
+    <div id="whiteDayBadge" style="display:none"><span class="white-days-badge">✦ Ayyam al-Bid — Fasting Day</span></div>
+  </div>
+
+  <!-- Ayyam al-Bid Info -->
+  <div class="info-card">
+    <div class="info-title">Ayyam al-Bid — الأيام البيض</div>
+    <div class="info-text">The Prophet ﷺ used to fast on the white days: the 13th, 14th, and 15th of every Hijri month. These are called the "white days" because the full moon illuminates the night sky.</div>
+    <div class="info-dates">
+      <div class="info-date-pill">13th</div>
+      <div class="info-date-pill">14th</div>
+      <div class="info-date-pill">15th</div>
+      <div class="info-date-pill">of every month</div>
+    </div>
+  </div>
+
+  <!-- Calendar -->
+  <div class="calendar-card">
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="changeMonth(-1)">&#8592;</button>
+      <div class="cal-month-title">
+        <div class="cal-month-hijri" id="calMonthHijri">—</div>
+        <div class="cal-month-greg" id="calMonthGreg">—</div>
+      </div>
+      <button class="cal-nav-btn" onclick="changeMonth(1)">&#8594;</button>
+    </div>
+    <div class="cal-toggle-row">
+      <div class="cal-mode-toggle">
+        <button class="toggle-btn active" id="btnHijri" onclick="setMode('hijri')">Hijri</button>
+        <button class="toggle-btn" id="btnGreg" onclick="setMode('greg')">Gregorian</button>
+      </div>
+    </div>
+    <div class="cal-grid-header">
+      <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot white"></div> Ayyam al-Bid (fasting days)</div>
+      <div class="legend-item"><div class="legend-dot today"></div> Today</div>
+    </div>
+  </div>
+
+  <!-- Upcoming fasts -->
+  <div class="upcoming-card" style="margin-bottom:24px">
+    <div class="upcoming-title">Upcoming Fasting Days</div>
+    <div class="upcoming-list" id="upcomingList">Loading...</div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="notif-card">
+    <div class="notif-title">🔔 Fasting Reminders</div>
+    <div class="notif-sub">Get reminded before each Ayyam al-Bid fasting day</div>
+
+    <!-- Timing options -->
+    <div class="notif-options">
+      <label class="notif-option selected" id="opt1" onclick="selectOption(this)">
+        <input type="radio" name="remind" value="evening"/>
+        <div class="notif-radio"></div>
+        <div class="notif-option-text"><strong>Evening before</strong><span>Reminder the night before each fasting day</span></div>
+      </label>
+      <label class="notif-option" id="opt2" onclick="selectOption(this)">
+        <input type="radio" name="remind" value="morning"/>
+        <div class="notif-radio"></div>
+        <div class="notif-option-text"><strong>Morning of</strong><span>Reminder on the morning of the fasting day</span></div>
+      </label>
+      <label class="notif-option" id="opt3" onclick="selectOption(this)">
+        <input type="radio" name="remind" value="both"/>
+        <div class="notif-radio"></div>
+        <div class="notif-option-text"><strong>Both</strong><span>Evening before + morning of fasting day</span></div>
+      </label>
+    </div>
+
+    <!-- Divider -->
+    <div style="border-top:1px solid var(--parchment-dark);margin:16px 0"></div>
+
+    <!-- Push notifications -->
+    <div class="reminder-section">
+      <div class="reminder-section-title">📱 Push Notifications</div>
+      <div class="reminder-section-sub">Receive alerts directly on this device</div>
+      <button class="notif-btn" id="pushBtn" onclick="enablePushNotifications()">Enable Push Notifications</button>
+      <button class="unsub-btn" id="pushUnsubBtn" onclick="disablePushNotifications()" style="display:none">Turn off push notifications</button>
+      <div class="notif-status" id="pushStatus"></div>
+    </div>
+
+    <div style="border-top:1px solid var(--parchment-dark);margin:16px 0"></div>
+
+    <!-- Email reminders -->
+    <div class="reminder-section">
+      <div class="reminder-section-title">✉️ Email Reminders</div>
+      <div class="reminder-section-sub">Get reminders sent to your inbox</div>
+      <div class="email-input-row" id="emailInputRow">
+        <input type="email" id="emailInput" placeholder="your@email.com" class="email-input"/>
+        <button class="notif-btn email-btn" onclick="enableEmailReminders()">Subscribe</button>
+      </div>
+      <button class="unsub-btn" id="emailUnsubBtn" onclick="disableEmailReminders()" style="display:none">Unsubscribe from emails</button>
+      <div class="notif-status" id="emailStatus"></div>
+    </div>
+  </div>
+
+  <!-- Donation Card -->
+  <div class="donation-card">
+    <div class="donation-symbol">☽</div>
+    <div class="donation-title">Support Noor</div>
+    <div class="donation-text">Noor is free and always will be. If it helps you remember your fasts, consider giving sadaqah to keep it running.</div>
+    <a href="https://www.paypal.com/donate?hosted_button_id=YOUR_PAYPAL_BUTTON_ID" target="_blank" rel="noopener" class="donation-btn">
+      Give Sadaqah 🤲
+    </a>
+    <div class="donation-note">Jazakallahu khayran — may it be accepted</div>
+  </div>
+
+</div>
+
+<script>
+// ─── Hijri Conversion via Intl API (Umm al-Qura, browser-native, accurate) ──
+
+const HIJRI_MONTHS = [
+  'Muharram','Safar','Rabīʿ al-Awwal','Rabīʿ al-Thani',
+  'Jumada al-Awwal','Jumada al-Thani','Rajab','Shaʿban',
+  'Ramadan','Shawwal','Dhu al-Qiʿda','Dhu al-Hijja'
+];
+const GREG_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// Use browser's built-in islamic-umalqura calendar — no approximation errors
+function gregorianToHijri(gYear, gMonth, gDay) {
+  const date = new Date(gYear, gMonth - 1, gDay);
+  const parts = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', {
+    year: 'numeric', month: 'numeric', day: 'numeric'
+  }).formatToParts(date);
+  const get = type => parseInt(parts.find(p => p.type === type).value);
+  return { year: get('year'), month: get('month'), day: get('day') };
+}
+
+// Get the Gregorian date for a given Hijri date by scanning nearby dates
+// We find the first day of the Hijri month by binary-searching around an estimate
+function hijriToGregorian(hYear, hMonth, hDay) {
+  // Rough JD estimate to get close
+  const approxJD = (hYear - 1) * 354.367 + (hMonth - 1) * 29.53 + hDay + 1948438.5;
+  const approxDate = new Date((approxJD - 2440587.5) * 86400000);
+
+  // Search within ±3 days of estimate
+  for (let offset = -3; offset <= 3; offset++) {
+    const candidate = new Date(approxDate);
+    candidate.setDate(candidate.getDate() + offset);
+    const h = gregorianToHijri(candidate.getFullYear(), candidate.getMonth() + 1, candidate.getDate());
+    if (h.year === hYear && h.month === hMonth && h.day === hDay) {
+      return candidate;
+    }
+  }
+  // Fallback: wider search
+  for (let offset = -15; offset <= 15; offset++) {
+    const candidate = new Date(approxDate);
+    candidate.setDate(candidate.getDate() + offset);
+    const h = gregorianToHijri(candidate.getFullYear(), candidate.getMonth() + 1, candidate.getDate());
+    if (h.year === hYear && h.month === hMonth && h.day === hDay) {
+      return candidate;
+    }
+  }
+  return approxDate;
+}
+
+// Get number of days in a Hijri month using Intl (accurate)
+function hijriMonthDays(hYear, hMonth) {
+  // Last day of month = day before 1st of next month
+  let nextMonth = hMonth + 1, nextYear = hYear;
+  if (nextMonth > 12) { nextMonth = 1; nextYear++; }
+  const firstOfNext = hijriToGregorian(nextYear, nextMonth, 1);
+  const lastOfThis = new Date(firstOfNext);
+  lastOfThis.setDate(lastOfThis.getDate() - 1);
+  const h = gregorianToHijri(lastOfThis.getFullYear(), lastOfThis.getMonth() + 1, lastOfThis.getDate());
+  return h.day;
+}
+
+
+
+// ─── State ───────────────────────────────────────────────────────────────────
+const today = new Date();
+today.setHours(0,0,0,0); // normalize for date comparison
+const todayH = gregorianToHijri(today.getFullYear(), today.getMonth() + 1, today.getDate());
+let viewH = { year: todayH.year, month: todayH.month };
+let calMode = 'hijri'; // 'hijri' or 'greg'
+
+// Gregorian view state (used when mode = greg)
+let viewG = { year: today.getFullYear(), month: today.getMonth() }; // 0-based month
+
+// ─── Render today banner ─────────────────────────────────────────────────────
+function renderToday() {
+  document.getElementById('todayHijri').textContent =
+    `${todayH.day} ${HIJRI_MONTHS[todayH.month - 1]} ${todayH.year} AH`;
+  const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  document.getElementById('todayGreg').textContent = today.toLocaleDateString('en-US', opts);
+  if ([13, 14, 15].includes(todayH.day)) {
+    document.getElementById('whiteDayBadge').style.display = 'block';
+  }
+}
+
+// ─── Calendar mode toggle ────────────────────────────────────────────────────
+function setMode(mode) {
+  calMode = mode;
+  document.getElementById('btnHijri').classList.toggle('active', mode === 'hijri');
+  document.getElementById('btnGreg').classList.toggle('active', mode === 'greg');
+  // Sync view when switching
+  if (mode === 'greg') {
+    // If we're viewing today's Hijri month, jump to today's Gregorian month (avoids conversion errors)
+    if (viewH.year === todayH.year && viewH.month === todayH.month) {
+      viewG = { year: today.getFullYear(), month: today.getMonth() };
+    } else {
+      // Estimate greg month from hijri: use midpoint of the hijri month for better accuracy
+      const midDay = 15;
+      const midG = hijriToGregorian(viewH.year, viewH.month, midDay);
+      viewG = { year: midG.getFullYear(), month: midG.getMonth() };
+    }
+  } else {
+    // Greg -> Hijri: convert middle of greg month for accuracy
+    const midGreg = new Date(viewG.year, viewG.month, 15);
+    const h = gregorianToHijri(midGreg.getFullYear(), midGreg.getMonth() + 1, midGreg.getDate());
+    viewH = { year: h.year, month: h.month };
+  }
+  renderCalendar();
+}
+
+// ─── Render calendar ─────────────────────────────────────────────────────────
+function renderCalendar() {
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  if (calMode === 'hijri') {
+    renderHijriCalendar();
+  } else {
+    renderGregCalendar();
+  }
+}
+
+function renderHijriCalendar() {
+  const { year: hy, month: hm } = viewH;
+  document.getElementById('calMonthHijri').textContent = `${HIJRI_MONTHS[hm - 1]} ${hy} AH`;
+
+  const firstDay = hijriToGregorian(hy, hm, 1);
+  const totalDays = hijriMonthDays(hy, hm);
+  const lastDay = hijriToGregorian(hy, hm, totalDays);
+  document.getElementById('calMonthGreg').textContent =
+    `${GREG_MONTHS[firstDay.getMonth()]} – ${GREG_MONTHS[lastDay.getMonth()]} ${lastDay.getFullYear()}`;
+
+  const startDow = firstDay.getDay();
+  const grid = document.getElementById('calGrid');
+
+  for (let i = 0; i < startDow; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    grid.appendChild(el);
+  }
+
+  for (let d = 1; d <= totalDays; d++) {
+    const gDate = hijriToGregorian(hy, hm, d);
+    // Compare in Hijri space to avoid round-trip conversion errors
+    const isToday = hy === todayH.year && hm === todayH.month && d === todayH.day;
+    const isWhite = [13, 14, 15].includes(d);
+
+    const el = document.createElement('div');
+    let cls = 'cal-day';
+    if (isToday) cls += ' today';
+    if (isWhite) cls += ' white-day';
+    if (!isToday && !isWhite) cls += ' normal';
+    el.className = cls;
+
+    // Main = hijri day, sub = gregorian day
+    el.innerHTML = `<div class="main-num">${d}</div><div class="sub-num">${gDate.getDate()}</div>`;
+    grid.appendChild(el);
+  }
+}
+
+function renderGregCalendar() {
+  const { year: gy, month: gm } = viewG; // gm is 0-based
+  const fullMonthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('calMonthHijri').textContent = `${fullMonthNames[gm]} ${gy}`;
+
+  // Show hijri months overlap as subtitle
+  const h1 = gregorianToHijri(gy, gm + 1, 1);
+  const daysInMonth = new Date(gy, gm + 1, 0).getDate();
+  const h2 = gregorianToHijri(gy, gm + 1, daysInMonth);
+  const sub = h1.month === h2.month
+    ? `${HIJRI_MONTHS[h1.month-1]} ${h1.year} AH`
+    : `${HIJRI_MONTHS[h1.month-1]} – ${HIJRI_MONTHS[h2.month-1]} ${h2.year} AH`;
+  document.getElementById('calMonthGreg').textContent = sub;
+
+  const firstDow = new Date(gy, gm, 1).getDay();
+  const grid = document.getElementById('calGrid');
+
+  for (let i = 0; i < firstDow; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    grid.appendChild(el);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const gDate = new Date(gy, gm, d);
+    const isToday = gy === today.getFullYear() && gm === today.getMonth() && d === today.getDate();
+    const hDate = gregorianToHijri(gy, gm + 1, d);
+    const isWhite = [13, 14, 15].includes(hDate.day);
+
+    const el = document.createElement('div');
+    let cls = 'cal-day';
+    if (isToday) cls += ' today';
+    if (isWhite) cls += ' white-day';
+    if (!isToday && !isWhite) cls += ' normal';
+    el.className = cls;
+
+    // Main = gregorian day, sub = hijri day
+    el.innerHTML = `<div class="main-num">${d}</div><div class="sub-num">${hDate.day}</div>`;
+    grid.appendChild(el);
+  }
+}
+
+function changeMonth(dir) {
+  if (calMode === 'hijri') {
+    viewH.month += dir;
+    if (viewH.month > 12) { viewH.month = 1; viewH.year++; }
+    if (viewH.month < 1) { viewH.month = 12; viewH.year--; }
+  } else {
+    viewG.month += dir;
+    if (viewG.month > 11) { viewG.month = 0; viewG.year++; }
+    if (viewG.month < 0) { viewG.month = 11; viewG.year--; }
+  }
+  renderCalendar();
+}
+
+// ─── Upcoming fasts ──────────────────────────────────────────────────────────
+function renderUpcoming() {
+  const list = document.getElementById('upcomingList');
+  list.innerHTML = '';
+
+  const upcoming = [];
+  let hy = todayH.year, hm = todayH.month;
+
+  for (let months = 0; months < 3; months++) {
+    for (const d of [13, 14, 15]) {
+      const gDate = hijriToGregorian(hy, hm, d);
+      const diff = Math.round((gDate - today) / 86400000);
+      if (diff >= 0) {
+        upcoming.push({ hDay: d, hMonth: hm, hYear: hy, gDate, diff });
+      }
+    }
+    hm++;
+    if (hm > 12) { hm = 1; hy++; }
+  }
+
+  const shown = upcoming.slice(0, 5);
+  shown.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'upcoming-item';
+    const dayName = item.gDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const gStr = item.gDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const label = item.diff === 0 ? 'Today' : item.diff === 1 ? 'Tomorrow' : `In ${item.diff} days`;
+    el.innerHTML = `
+      <div class="upcoming-item-left">
+        <strong>${item.hDay} ${HIJRI_MONTHS[item.hMonth-1]}</strong>
+        <span>${dayName}, ${gStr}</span>
+      </div>
+      <div class="upcoming-countdown">${label}<small>${item.diff === 0 ? '🌙' : ''}</small></div>
+    `;
+    list.appendChild(el);
+  });
+}
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDa5CZg-6-ov2engEJiOwaLeOi3kVDS3g4",
+  authDomain: "noor-6efb3.firebaseapp.com",
+  projectId: "noor-6efb3",
+  storageBucket: "noor-6efb3.firebasestorage.app",
+  messagingSenderId: "881911652427",
+  appId: "1:881911652427:web:ecd82b9fe0040bbebcedce"
+};
+const VAPID_KEY = "BCs7Eigskpkln7zsemKPa1TRt0jqvtYDeBDJfhls4W4iFTaH2Q0KWIFnvz2pjZFUeBqXBliddXVs2sHYMCV4-Hk";
+const EMAILJS_PUBLIC_KEY = "_O38eWXHJdrijknHT";
+const EMAILJS_SERVICE_ID = "service_ys14bnd";
+const EMAILJS_TEMPLATE_ID = "template_npvb9gg";
+
+// ─── Init Firebase ────────────────────────────────────────────────────────────
+let messaging = null;
+try {
+  if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+  messaging = firebase.messaging();
+} catch(e) { console.warn('Firebase init failed:', e); }
+
+// ─── Init EmailJS ─────────────────────────────────────────────────────────────
+try { emailjs.init(EMAILJS_PUBLIC_KEY); } catch(e) { console.warn('EmailJS init failed:', e); }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function selectOption(el) {
+  document.querySelectorAll('.notif-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function showPushStatus(msg, type) {
+  const el = document.getElementById('pushStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'notif-status ' + type;
+}
+
+function showEmailStatus(msg, type) {
+  const el = document.getElementById('emailStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'notif-status ' + type;
+}
+
+function getSelectedTiming() {
+  return document.querySelector('.notif-option.selected input')?.value || 'evening';
+}
+
+function getNextFastingDays(count) {
+  const days = [];
+  let hy = todayH.year, hm = todayH.month;
+  for (let m = 0; m < 3; m++) {
+    for (const d of [13, 14, 15]) {
+      const gDate = hijriToGregorian(hy, hm, d);
+      const diff = Math.round((gDate - today) / 86400000);
+      if (diff >= 0) days.push({
+        hijriDay: d, hijriMonth: hm, hijriYear: hy, gDate, diff,
+        label: d + ' ' + HIJRI_MONTHS[hm-1] + ' ' + hy + ' AH',
+        gregLabel: gDate.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
+      });
+    }
+    hm++; if (hm > 12) { hm = 1; hy++; }
+  }
+  return days.slice(0, count);
+}
+
+// ─── Push Notifications ───────────────────────────────────────────────────────
+async function waitForServiceWorker() {
+  if (!('serviceWorker' in navigator)) throw new Error('Service workers not supported in this browser.');
+  // Register firebase-messaging-sw.js explicitly
+  let reg = await navigator.serviceWorker.getRegistration('/firebase-cloud-messaging-push-scope');
+  if (!reg) {
+    reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+  }
+  // Wait until it's active
+  if (reg.active) return reg;
+  return new Promise((resolve, reject) => {
+    const sw = reg.installing || reg.waiting;
+    if (!sw) return reject(new Error('No service worker found.'));
+    sw.addEventListener('statechange', () => {
+      if (sw.state === 'activated') resolve(reg);
+      if (sw.state === 'redundant') reject(new Error('Service worker install failed.'));
+    });
+  });
+}
+
+async function enablePushNotifications() {
+  const btn = document.getElementById('pushBtn');
+  btn.disabled = true;
+  btn.textContent = 'Requesting permission...';
+
+  try {
+    if (!messaging) throw new Error('Firebase Messaging not available. Try Chrome.');
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      showPushStatus('Permission denied. Please allow notifications in browser settings.', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Enable Push Notifications';
+      return;
+    }
+
+    btn.textContent = 'Activating service worker...';
+    const swReg = await waitForServiceWorker();
+
+    btn.textContent = 'Registering...';
+    const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+    if (!token) throw new Error('Could not get push token. Try refreshing.');
+
+    const timing = getSelectedTiming();
+    const payload = {
+      fields: {
+        token: { stringValue: token },
+        timing: { stringValue: timing },
+        createdAt: { stringValue: new Date().toISOString() },
+        active: { booleanValue: true }
+      }
+    };
+
+    const docId = encodeURIComponent(token.slice(-28).replace(/[^a-zA-Z0-9]/g, '_'));
+    await fetch(
+      'https://firestore.googleapis.com/v1/projects/noor-6efb3/databases/(default)/documents/subscribers/' + docId,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+    );
+
+    localStorage.setItem('noor_push_enabled', '1');
+    localStorage.setItem('noor_push_token', token);
+
+    const next = getNextFastingDays(1)[0];
+    swReg.showNotification('Noor ✦ Reminders Active', {
+      body: 'Next fasting day: ' + (next ? next.gregLabel : 'coming soon'),
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'noor-confirm'
+    });
+
+    showPushStatus('✦ Push reminders enabled! You will be notified before each fasting day.', 'success');
+    btn.textContent = '✓ Push Enabled';
+    btn.style.display = 'none';
+    document.getElementById('pushUnsubBtn').style.display = '';
+
+  } catch(err) {
+    console.error('Push error:', err);
+    showPushStatus('Error: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Enable Push Notifications';
+  }
+}
+
+// ─── Email Reminders ──────────────────────────────────────────────────────────
+async function enableEmailReminders() {
+  const emailInput = document.getElementById('emailInput');
+  const email = emailInput.value.trim();
+
+  if (!email || !email.includes('@') || !email.includes('.')) {
+    showEmailStatus('Please enter a valid email address.', 'error');
+    return;
+  }
+
+  showEmailStatus('Subscribing...', 'info');
+
+  const nextDays = getNextFastingDays(3);
+  const timing = getSelectedTiming();
+  const timingLabel = timing === 'evening' ? 'the evening before'
+    : timing === 'morning' ? 'the morning of'
+    : 'the evening before and morning of';
+
+  try {
+    // 1. Save email to Firestore so cloud function can send future reminders
+    const docId = encodeURIComponent(email.replace(/[^a-zA-Z0-9]/g, '_'));
+    const payload = {
+      fields: {
+        email: { stringValue: email },
+        timing: { stringValue: timing },
+        createdAt: { stringValue: new Date().toISOString() },
+        active: { booleanValue: true }
+      }
+    };
+    const firestoreRes = await fetch(
+      'https://firestore.googleapis.com/v1/projects/noor-6efb3/databases/(default)/documents/emailSubscribers/' + docId,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+    );
+    if (!firestoreRes.ok) throw new Error('Could not save subscription.');
+
+    // 2. Send confirmation email via EmailJS
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email: email,
+      to_name: email.split('@')[0],
+      timing_label: timingLabel,
+      next_fast_1: nextDays[0] ? nextDays[0].gregLabel : '',
+      next_fast_2: nextDays[1] ? nextDays[1].gregLabel : '',
+      next_fast_3: nextDays[2] ? nextDays[2].gregLabel : '',
+      reply_to: email
+    });
+
+    localStorage.setItem('noor_email', email);
+    localStorage.setItem('noor_email_timing', timing);
+    showEmailStatus('✦ Subscribed! Check your inbox for confirmation. Barakallahu feek.', 'success');
+    emailInput.value = '';
+    document.getElementById('emailInputRow').style.display = 'none';
+    document.getElementById('emailUnsubBtn').style.display = '';
+
+  } catch(err) {
+    console.error('Email error:', err);
+    showEmailStatus('Could not subscribe: ' + err.message, 'error');
+  }
+}
+
+// ─── Unsubscribe Push ────────────────────────────────────────────────────────
+async function disablePushNotifications() {
+  try {
+    const token = localStorage.getItem('noor_push_token');
+
+    // Mark inactive in Firestore
+    if (token) {
+      const docId = encodeURIComponent(token.slice(-28).replace(/[^a-zA-Z0-9]/g, '_'));
+      await fetch(
+        'https://firestore.googleapis.com/v1/projects/noor-6efb3/databases/(default)/documents/subscribers/' + docId + '?updateMask.fieldPaths=active',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: { active: { booleanValue: false } } })
+        }
+      );
+      // Unsubscribe from FCM
+      if (messaging) await messaging.deleteToken();
+    }
+
+    localStorage.removeItem('noor_push_enabled');
+    localStorage.removeItem('noor_push_token');
+
+    const btn = document.getElementById('pushBtn');
+    const unsubBtn = document.getElementById('pushUnsubBtn');
+    btn.textContent = 'Enable Push Notifications';
+    btn.disabled = false;
+    btn.style.display = '';
+    unsubBtn.style.display = 'none';
+    showPushStatus('Push notifications disabled.', 'info');
+  } catch(err) {
+    console.error(err);
+    showPushStatus('Could not unsubscribe: ' + err.message, 'error');
+  }
+}
+
+// ─── Unsubscribe Email ────────────────────────────────────────────────────────
+async function disableEmailReminders() {
+  try {
+    const email = localStorage.getItem('noor_email');
+    if (email) {
+      const docId = encodeURIComponent(email.replace(/[^a-zA-Z0-9]/g, '_'));
+      await fetch(
+        'https://firestore.googleapis.com/v1/projects/noor-6efb3/databases/(default)/documents/emailSubscribers/' + docId + '?updateMask.fieldPaths=active',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: { active: { booleanValue: false } } })
+        }
+      );
+    }
+  } catch(err) { console.warn('Unsubscribe Firestore error:', err); }
+
+  localStorage.removeItem('noor_email');
+  localStorage.removeItem('noor_email_timing');
+  document.getElementById('emailInputRow').style.display = '';
+  document.getElementById('emailUnsubBtn').style.display = 'none';
+  document.getElementById('emailInput').value = '';
+  showEmailStatus('Email reminders cancelled. You can re-subscribe anytime.', 'info');
+}
+
+// ─── Restore saved state ──────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  if (localStorage.getItem('noor_push_enabled')) {
+    const btn = document.getElementById('pushBtn');
+    const unsubBtn = document.getElementById('pushUnsubBtn');
+    if (btn) { btn.textContent = '✓ Push Enabled'; btn.style.display = 'none'; }
+    if (unsubBtn) unsubBtn.style.display = '';
+    showPushStatus('✦ Push reminders are active on this device.', 'success');
+  }
+  const savedEmail = localStorage.getItem('noor_email');
+  if (savedEmail) {
+    document.getElementById('emailInputRow').style.display = 'none';
+    document.getElementById('emailUnsubBtn').style.display = '';
+    showEmailStatus('✦ Email reminders active for ' + savedEmail, 'success');
+  }
+});
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+renderToday();
+renderCalendar();
+renderUpcoming();
+
+// ─── PWA Service Worker ──────────────────────────────────────────────────────
+// Register firebase-messaging-sw.js as the main SW — it handles both
+// push notifications AND offline caching (we merged both into it)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
+    .then(reg => console.log('SW registered:', reg.scope))
+    .catch(err => console.warn('SW registration failed:', err));
+}
+
+// ─── Install prompt ───────────────────────────────────────────────────────────
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const banner = document.createElement('div');
+  banner.id = 'installBanner';
+  banner.style.cssText = `
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:#1a1410;color:#e8d5a3;padding:14px 20px;
+    border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.3);
+    display:flex;align-items:center;gap:12px;z-index:9999;
+    font-family:'DM Sans',sans-serif;font-size:14px;
+    border:1px solid rgba(201,168,76,0.3);max-width:340px;width:calc(100% - 40px);
+  `;
+  banner.innerHTML = `
+    <span style="font-size:22px">&#9789;</span>
+    <span style="flex:1">Add <strong style="color:#c9a84c">Noor</strong> to your home screen</span>
+    <button onclick="installApp()" style="background:#c9a84c;color:#1a1410;border:none;padding:8px 14px;border-radius:8px;font-weight:500;cursor:pointer;font-family:inherit;font-size:13px">Install</button>
+    <button onclick="document.getElementById('installBanner').remove()" style="background:none;border:none;color:#6a5a3a;cursor:pointer;font-size:18px;line-height:1;padding:0 2px">&times;</button>
+  `;
+  document.body.appendChild(banner);
+});
+
+window.installApp = async function() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  const banner = document.getElementById('installBanner');
+  if (banner) banner.remove();
+  if (outcome === 'accepted') showStatus('&#10022; Noor installed! Open it from your home screen.', 'success');
+};
+
+window.addEventListener('appinstalled', () => {
+  const banner = document.getElementById('installBanner');
+  if (banner) banner.remove();
+});
+</script>
+</body>
+</html>
