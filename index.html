@@ -9,9 +9,15 @@
     const url = new URL(location.href);
     let dirty = false;
     TRACKING_PARAMS.forEach(function(p) { if (url.searchParams.has(p)) { url.searchParams.delete(p); dirty = true; } });
-    if (dirty && window.history && window.history.replaceState) {
-      // replaceState cleans the URL bar without a reload — works in Facebook in-app browser
-      history.replaceState(null, '', url.toString());
+    if (dirty) {
+      // In Facebook in-app browser, location.replace() triggers a navigation that FBIAB blocks.
+      // Use history.replaceState (URL-bar only) there; use location.replace() everywhere else.
+      var isFBIAB = /FBAN|FBAV|FBIOS|FB_IAB|FB4A|FBDV/i.test(navigator.userAgent);
+      if (isFBIAB && window.history && window.history.replaceState) {
+        history.replaceState(null, '', url.toString());
+      } else {
+        location.replace(url.toString());
+      }
     }
   })();
 </script>
