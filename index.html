@@ -9,7 +9,7 @@
     const url = new URL(location.href);
     let dirty = false;
     TRACKING_PARAMS.forEach(function(p) { if (url.searchParams.has(p)) { url.searchParams.delete(p); dirty = true; } });
-    if (dirty) location.replace(url.toString());
+    if (dirty) setTimeout(function() { location.replace(url.toString()); }, 0);
   })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>

@@ -64,13 +64,11 @@ self.addEventListener('fetch', e => {
   if (e.request.url.includes('firebase')) return;
 
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then(cached =>
+    caches.match(e.request).then(cached =>
       cached || fetch(e.request).then(res => {
         if (res.ok) {
           const clone = res.clone();
-          // Cache without query params so future fbclid/utm visits hit the cache
-          const cleanUrl = e.request.url.split('?')[0];
-          caches.open(CACHE).then(c => c.put(new Request(cleanUrl), clone));
+          caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
       })
