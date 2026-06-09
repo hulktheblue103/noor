@@ -1386,15 +1386,16 @@ window.addEventListener('appinstalled', () => {
 });
 
 // ─── Facebook in-app browser banner ──────────────────────────────────────────
+// If location.replace() succeeded, fbclid is gone. If it's still here, the
+// redirect was blocked (in-app browser) — show the "open in real browser" banner.
 (function() {
-  const ua = navigator.userAgent || '';
-  const isFBIAB = /FBAN|FBAV|FBIOS|FB_IAB|FB4A|FBDV/i.test(ua);
-  if (!isFBIAB) return;
+  if (!location.search.includes('fbclid')) return;
 
+  const ua = navigator.userAgent || '';
   const isIOS = /iPhone|iPad|iPod/i.test(ua);
   const hint = isIOS
     ? 'Tap <strong style="color:#c9a84c">⋯</strong> below → <em>Open in Safari</em>'
-    : 'Tap <strong style="color:#c9a84c">⋮</strong> → <em>Open in Chrome</em>';
+    : 'Tap <strong style="color:#c9a84c">⋮</strong> above → <em>Open in browser</em>';
 
   const banner = document.createElement('div');
   banner.id = 'fbiabBanner';
