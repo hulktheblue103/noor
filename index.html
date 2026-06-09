@@ -9,16 +9,7 @@
     const url = new URL(location.href);
     let dirty = false;
     TRACKING_PARAMS.forEach(function(p) { if (url.searchParams.has(p)) { url.searchParams.delete(p); dirty = true; } });
-    if (dirty) {
-      // In Facebook in-app browser, location.replace() triggers a navigation that FBIAB blocks.
-      // Use history.replaceState (URL-bar only) there; use location.replace() everywhere else.
-      var isFBIAB = /FBAN|FBAV|FBIOS|FB_IAB|FB4A|FBDV/i.test(navigator.userAgent);
-      if (isFBIAB && window.history && window.history.replaceState) {
-        history.replaceState(null, '', url.toString());
-      } else {
-        location.replace(url.toString());
-      }
-    }
+    if (dirty) location.replace(url.toString());
   })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>

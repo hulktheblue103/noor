@@ -1,7 +1,7 @@
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
-const CACHE = 'noor-v5';
+const CACHE = 'noor-v6';
 
 firebase.initializeApp({
   apiKey: "YOUR_FIREBASE_API_KEY",
@@ -44,7 +44,7 @@ self.addEventListener('notificationclick', e => {
 
 // ─── Offline caching ──────────────────────────────────────────────────────────
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/'])));
+  e.waitUntil(caches.open(CACHE).then(c => c.add(new Request('/', { cache: 'reload' }))));
   self.skipWaiting();
 });
 
