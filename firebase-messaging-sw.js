@@ -44,7 +44,7 @@ self.addEventListener('notificationclick', e => {
 
 // ─── Offline caching ──────────────────────────────────────────────────────────
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.add(new Request('/', { cache: 'reload' }))));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/', '/firebase-messaging-sw.js', '/manifest.json'])));
   self.skipWaiting();
 });
 

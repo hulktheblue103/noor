@@ -9,7 +9,7 @@
     const url = new URL(location.href);
     let dirty = false;
     TRACKING_PARAMS.forEach(function(p) { if (url.searchParams.has(p)) { url.searchParams.delete(p); dirty = true; } });
-    if (dirty) setTimeout(function() { location.replace(url.toString()); }, 0);
+    if (dirty) location.replace(url.toString());
   })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -1384,6 +1384,64 @@ window.addEventListener('appinstalled', () => {
   const banner = document.getElementById('installBanner');
   if (banner) banner.remove();
 });
+
+// ─── Facebook in-app browser banner ──────────────────────────────────────────
+(function() {
+  const ua = navigator.userAgent || '';
+  const isFBIAB = /FBAN|FBAV|FBIOS|FB_IAB|FB4A|FBDV/i.test(ua);
+  if (!isFBIAB) return;
+
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const hint = isIOS
+    ? 'Tap <strong style="color:#c9a84c">⋯</strong> below → <em>Open in Safari</em>'
+    : 'Tap <strong style="color:#c9a84c">⋮</strong> → <em>Open in Chrome</em>';
+
+  const banner = document.createElement('div');
+  banner.id = 'fbiabBanner';
+  banner.style.cssText = `
+    position:fixed;top:0;left:0;right:0;z-index:99999;
+    background:#1a1410;color:#e8d5a3;padding:14px 16px;
+    display:flex;align-items:center;gap:12px;
+    font-family:'DM Sans',sans-serif;font-size:13px;
+    border-bottom:1px solid rgba(201,168,76,0.4);
+  `;
+
+  const cleanUrl = location.href.replace(/[?&]fbclid=[^&]+/, '').replace(/[?&]$/, '');
+
+  banner.innerHTML = `
+    <span style="font-size:20px">☽</span>
+    <span style="flex:1;line-height:1.4">
+      <strong style="color:#c9a84c">Noor</strong> works best in your browser.<br>
+      <span style="color:#a89060;font-size:12px">${hint}</span>
+    </span>
+    <button id="fbiabCopy" style="background:#c9a84c;color:#1a1410;border:none;padding:8px 12px;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit;font-size:12px;white-space:nowrap">Copy Link</button>
+    <button onclick="document.getElementById('fbiabBanner').remove()" style="background:none;border:none;color:#6a5a3a;cursor:pointer;font-size:20px;line-height:1;padding:0 2px;flex-shrink:0">&times;</button>
+  `;
+
+  document.body.appendChild(banner);
+
+  document.getElementById('fbiabCopy').addEventListener('click', function() {
+    const btn = this;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cleanUrl).then(function() {
+        btn.textContent = 'Copied!';
+        btn.style.background = '#5a8a5a';
+        setTimeout(function() { btn.textContent = 'Copy Link'; btn.style.background = '#c9a84c'; }, 2000);
+      });
+    } else {
+      // Fallback: select a temporary input
+      const tmp = document.createElement('input');
+      tmp.value = cleanUrl;
+      document.body.appendChild(tmp);
+      tmp.select();
+      document.execCommand('copy');
+      document.body.removeChild(tmp);
+      btn.textContent = 'Copied!';
+      btn.style.background = '#5a8a5a';
+      setTimeout(function() { btn.textContent = 'Copy Link'; btn.style.background = '#c9a84c'; }, 2000);
+    }
+  });
+})();
 </script>
 </body>
 </html>
