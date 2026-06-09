@@ -2,6 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<script>
+  // Strip Facebook (fbclid) and other tracking params, redirect to clean URL
+  (function() {
+    const TRACKING_PARAMS = ['fbclid', 'fb_action_ids', 'fb_action_types', 'fb_source', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+    const url = new URL(location.href);
+    let dirty = false;
+    TRACKING_PARAMS.forEach(function(p) { if (url.searchParams.has(p)) { url.searchParams.delete(p); dirty = true; } });
+    if (dirty) location.replace(url.toString());
+  })();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Noor — Hijri Calendar & Fasting Reminder</title>
 
