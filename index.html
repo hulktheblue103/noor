@@ -1166,10 +1166,11 @@ async function enablePushNotifications() {
     };
 
     const docId = encodeURIComponent(token.slice(-28).replace(/[^a-zA-Z0-9]/g, '_'));
-    await fetch(
+    const fsRes = await fetch(
       'https://firestore.googleapis.com/v1/projects/noor-6efb3/databases/(default)/documents/subscribers/' + docId,
       { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
     );
+    if (!fsRes.ok) throw new Error('Failed to save subscription (' + fsRes.status + '). Please try again.');
 
     localStorage.setItem('noor_push_enabled', '1');
     localStorage.setItem('noor_push_token', token);
