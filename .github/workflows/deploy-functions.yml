@@ -31,8 +31,7 @@ jobs:
         working-directory: functions
 
       - name: Inject secrets into functions
-        run: |
-          sed -i "s|YOUR_EMAILJS_PRIVATE_KEY|${{ secrets.EMAILJS_PRIVATE_KEY }}|g" functions/index.js
+        run: echo "No server-side secrets needed"
 
       - name: Deploy Firebase Functions
         uses: w9jds/firebase-action@master
