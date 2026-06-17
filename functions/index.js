@@ -63,6 +63,26 @@ function getNextWhiteDays(fromDate) {
   return days.slice(0, 3);
 }
 
+async function deactivateBadTokens(tokens, batchResponse) {
+  const toDeactivate = [];
+  batchResponse.responses.forEach((resp, i) => {
+    if (!resp.success) {
+      console.log(`Token failed [${resp.error?.code}]: ...${tokens[i].slice(-12)}`);
+      const code = resp.error?.code;
+      if (code === 'messaging/registration-token-not-registered' ||
+          code === 'messaging/invalid-registration-token') {
+        toDeactivate.push(tokens[i]);
+      }
+    }
+  });
+  if (toDeactivate.length === 0) return;
+  const snap = await db.collection("subscribers").where("token", "in", toDeactivate).get();
+  const batch = db.batch();
+  snap.forEach(doc => batch.update(doc.ref, { active: false }));
+  await batch.commit();
+  console.log(`Deactivated ${toDeactivate.length} stale token(s)`);
+}
+
 // Send email via EmailJS REST API (server-side)
 function sendEmailJS(toEmail, toName, templateParams) {
   return new Promise((resolve, reject) => {
@@ -116,22 +136,34 @@ async function sendReminders({ forceAll = false } = {}) {
   const pushSends = [];
   if (forceAll) {
     const all = [...new Set([...eveningPushTokens, ...morningPushTokens])];
-    if (all.length > 0) pushSends.push(messaging.sendEachForMulticast({
-      tokens: all,
-      notification: { title: "Noor ✦ Test Reminder", body: "This is a test. Your fasting reminders are working! 🌙" },
-      webpush: { notification: { icon: "https://aiyam.blue-prophecy.com/icon-192.png" }, fcmOptions: { link: "https://aiyam.blue-prophecy.com" } }
-    }));
+    if (all.length > 0) {
+      const result = await messaging.sendEachForMulticast({
+        tokens: all,
+        notification: { title: "Noor ✦ Test Reminder", body: "This is a test. Your fasting reminders are working! 🌙" },
+        webpush: { notification: { icon: "https://aiyam.blue-prophecy.com/icon-192.png" }, fcmOptions: { link: "https://aiyam.blue-prophecy.com" } }
+      });
+      pushSends.push(result);
+      await deactivateBadTokens(all, result);
+    }
   } else {
-    if (eveningPushTokens.length > 0) pushSends.push(messaging.sendEachForMulticast({
-      tokens: eveningPushTokens,
-      notification: { title: "Noor ✦ Fasting Tomorrow", body: `Tomorrow (${formatGregDate(tomorrow)}) is an Ayyam al-Bid fasting day. Make your intention tonight.` },
-      webpush: { notification: { icon: "https://aiyam.blue-prophecy.com/icon-192.png" }, fcmOptions: { link: "https://aiyam.blue-prophecy.com" } }
-    }));
-    if (morningPushTokens.length > 0) pushSends.push(messaging.sendEachForMulticast({
-      tokens: morningPushTokens,
-      notification: { title: "Noor ✦ Fasting Day", body: `Today (${formatGregDate(today)}) is an Ayyam al-Bid fasting day. May Allah accept your fast. 🌙` },
-      webpush: { notification: { icon: "https://aiyam.blue-prophecy.com/icon-192.png" }, fcmOptions: { link: "https://aiyam.blue-prophecy.com" } }
-    }));
+    if (eveningPushTokens.length > 0) {
+      const result = await messaging.sendEachForMulticast({
+        tokens: eveningPushTokens,
+        notification: { title: "Noor ✦ Fasting Tomorrow", body: `Tomorrow (${formatGregDate(tomorrow)}) is an Ayyam al-Bid fasting day. Make your intention tonight.` },
+        webpush: { notification: { icon: "https://aiyam.blue-prophecy.com/icon-192.png" }, fcmOptions: { link: "https://aiyam.blue-prophecy.com" } }
+      });
+      pushSends.push(result);
+      await deactivateBadTokens(eveningPushTokens, result);
+    }
+    if (morningPushTokens.length > 0) {
+      const result = await messaging.sendEachForMulticast({
+        tokens: morningPushTokens,
+        notification: { title: "Noor ✦ Fasting Day", body: `Today (${formatGregDate(today)}) is an Ayyam al-Bid fasting day. May Allah accept your fast. 🌙` },
+        webpush: { notification: { icon: "https://aiyam.blue-prophecy.com/icon-192.png" }, fcmOptions: { link: "https://aiyam.blue-prophecy.com" } }
+      });
+      pushSends.push(result);
+      await deactivateBadTokens(morningPushTokens, result);
+    }
   }
 
   // ── Email notifications ───────────────────────────────────────────────────
