@@ -31,6 +31,7 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
 <!-- EmailJS -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
@@ -1053,7 +1054,8 @@ const FIREBASE_CONFIG = {
   projectId: "noor-6efb3",
   storageBucket: "noor-6efb3.firebasestorage.app",
   messagingSenderId: "881911652427",
-  appId: "1:881911652427:web:ecd82b9fe0040bbebcedce"
+  appId: "1:881911652427:web:ecd82b9fe0040bbebcedce",
+  measurementId: "G-D4JZG4B4EW"
 };
 const VAPID_KEY = "BCs7Eigskpkln7zsemKPa1TRt0jqvtYDeBDJfhls4W4iFTaH2Q0KWIFnvz2pjZFUeBqXBliddXVs2sHYMCV4-Hk";
 const EMAILJS_PUBLIC_KEY = "_O38eWXHJdrijknHT";
@@ -1065,6 +1067,7 @@ let messaging = null;
 try {
   if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
   messaging = firebase.messaging();
+  firebase.analytics();
 } catch(e) { console.warn('Firebase init failed:', e); }
 
 // ─── Init EmailJS ─────────────────────────────────────────────────────────────
