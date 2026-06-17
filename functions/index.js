@@ -18,7 +18,7 @@ const HIJRI_MONTHS = [
 
 const EMAILJS_SERVICE_ID = "service_ys14bnd";
 const EMAILJS_TEMPLATE_ID = "template_npvb9gg";
-const EMAILJS_PUBLIC_KEY = "_O38eWXHJdrijknHT";
+const EMAILJS_PRIVATE_KEY = "YOUR_EMAILJS_PRIVATE_KEY"; // Add this from EmailJS dashboard → Account → API Keys
 
 // Convert Gregorian date to Hijri date (using the Umm al-Qura approximation)
 function gregorianToHijri(date) {
@@ -69,7 +69,8 @@ function sendEmailJS(toEmail, toName, templateParams) {
     const body = JSON.stringify({
       service_id: EMAILJS_SERVICE_ID,
       template_id: EMAILJS_TEMPLATE_ID,
-      user_id: EMAILJS_PUBLIC_KEY,
+      user_id: "_O38eWXHJdrijknHT",
+      accessToken: EMAILJS_PRIVATE_KEY,
       template_params: templateParams
     });
     const req = https.request({
@@ -159,6 +160,7 @@ async function sendReminders({ forceAll = false } = {}) {
         next_fast_1: nextDays[0] || "",
         next_fast_2: nextDays[1] || "",
         next_fast_3: nextDays[2] || "",
+        reply_to: "noreply@aiyam.blue-prophecy.com"
       }).catch(err => console.error("Email failed for", email, err.message))
     );
   });
